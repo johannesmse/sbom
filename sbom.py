@@ -46,11 +46,19 @@ def read_package_file(path, sbom):
 
 def write_to_csv(sbom, path):
     csv_path = path + "sbom.csv"
+
     with open(csv_path, 'w', newline='') as f:
         fieldnames = ["name", "version", "type", "path"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writerows(sbom)
-        print(f"Saved SBOM in CSV format to '{csv_path}")
+        print(f"Saved SBOM in CSV format to '{csv_path}'")
+
+def write_to_json(sbom, path):
+    json_path = path + "sbom.json"
+
+    with open(json_path, 'w') as f:
+        json.dump(sbom, f)
+        print(f"Saved SBOM in JSON format to '{json_path}'")
 
 
 def main():
@@ -73,6 +81,7 @@ def main():
                 read_package_file(package_path, sbom)
 
     write_to_csv(sbom, path)
+    write_to_json(sbom, path)
 
 
 
