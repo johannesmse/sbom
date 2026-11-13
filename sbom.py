@@ -1,6 +1,7 @@
 import os
 import json
 import csv
+import sys
 
 def read_requirements_file(path, sbom):
     """
@@ -62,8 +63,13 @@ def write_to_json(sbom, path):
 
 
 def main():
+    if len(sys.argv) != 2:
+        print(f"Expected 1 argument (directory path), but {len(sys.argv) - 1} were given.")
+        sys.exit(1)
+
+
     sbom = []
-    path = "/home/jmse/code/projects/sbom/test_repos/"
+    path = sys.argv[1]
 
     # Traverse subdirectories
     for root, dirs, files in os.walk(path):
@@ -82,8 +88,6 @@ def main():
 
     write_to_csv(sbom, path)
     write_to_json(sbom, path)
-
-
 
 
 main()
