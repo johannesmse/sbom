@@ -1,12 +1,6 @@
 import os
 import json
-
-def add_to_sbom(name, version, dependency_type, path, sbom):
-    # Check if dependency already added
-    if name not in sbom:
-        sbom[name] = [(version, dependency_type, path)]
-    else:
-        sbom[name].append((version, dependency_type, path))
+import csv
 
 def read_requirements_file(path, sbom):
     """
@@ -25,9 +19,7 @@ def read_requirements_file(path, sbom):
             for line in lines:
                 line = line.strip('\n')
                 name, version = line.split("==")
-
-                add_to_sbom(name, version, dependency_type, path, sbom)
-
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
@@ -43,18 +35,27 @@ def read_package_file(path, sbom):
             # .get returns an empty dict if key is not found
             # reads dependencies into sbom
             for name, version in data.get("dependencies", {}).items():
-                add_to_sbom(name, version, dependency_type, path, sbom)
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
 
             # reads devDependencies into sbom
             for name, version in data.get("devDependencies", {}).items():
-                add_to_sbom(name, version, dependency_type, path, sbom)
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
 
+def write_to_csv(sbom, path):
+    csv_path = path + "sbom.csv"
+    with open(csv_path, 'w', newline='') as f:
+        fieldnames = ["name", "version", "type", "path"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writerows(sbom)
+        print(f"Saved SBOM in CSV format to '{csv_path}")
+
+
 def main():
-    sbom = {}
-    path = "/home/jmse/code/projects/sbom/test_repos"
+    sbom = []
+    path = "/home/jmse/code/projects/sbom/test_repos/"
 
     # Traverse subdirectories
     for root, dirs, files in os.walk(path):
@@ -70,6 +71,8 @@ def main():
             if "package.json" in files:
                 package_path = root + "/package.json"
                 read_package_file(package_path, sbom)
+
+    write_to_csv(sbom, path)
 
 
 
