@@ -64,17 +64,32 @@ def write_to_json(sbom, path):
 
 def main():
     if len(sys.argv) != 2:
-        print(f"Expected 1 argument (directory path), but {len(sys.argv) - 1} were given.")
+        print(f"Error: expected 1 argument (directory path), but {len(sys.argv) - 1} were given.")
         sys.exit(1)
+
+    path = sys.argv[1]
+    if not os.path.exists(path):
+        print("Error: the specified path does not exist.")
+        sys.exit(1)
+
+    if not os.path.isdir(path):
+        print("Error: the specified path is not a directory.")
+        sys.exit(1)
+
+    if path[-1] != '/':
+        path += '/'
 
 
     sbom = []
-    path = sys.argv[1]
-
     # Traverse subdirectories
     for root, dirs, files in os.walk(path):
         if root == path:
             print(f"Found {len(dirs)} repositories in '{path}'\n")
+
+            if len(dirs) == 0:
+                print("Error: no subdirectories in the specified path was found.")
+                sys.exit(1)
+                
         else:
             # Check for requirements.txt file
             if "requirements.txt" in files:
@@ -85,6 +100,10 @@ def main():
             if "package.json" in files:
                 package_path = root + "/package.json"
                 read_package_file(package_path, sbom)
+
+    if len(sbom) == 0:
+        print("Did not find any dependencies to list in SBOM.")
+        sys.exit(0)
 
     write_to_csv(sbom, path)
     write_to_json(sbom, path)
