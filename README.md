@@ -6,7 +6,7 @@ The SBOM includes the following columns:
 * Version
 * Type (npm or pip)
 * Absolute path to where the dependency was found
-* Git commit hash of the source code repo
+* Git commit hash of the source code repository
 
 ## How to run
 With python 3, run the sbom.py file with a directory containing 1 or more source code repositories as argument, for example:
