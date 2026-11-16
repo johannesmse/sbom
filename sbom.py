@@ -5,13 +5,13 @@ import sys
 
 def read_requirements_file(path, sbom):
     """
-    Reads a file at path given as argument and saves 
-    name, version, type and path to dictionary given as argument.
-    This method expects the text format to match the standard pip freeze requirements.txt format created by pip. 
+    Reads a requirements.txt file and appends its dependencies to the SBOM.
+    Dependencies are represented by a dictionary containing name, version, type and path.
+
+    Expects the file to follow the format name==version. 
     """
 
     dependency_type = "pip"
-
     try:
         with open (path) as f:
             print("Opening", path)
@@ -26,28 +26,61 @@ def read_requirements_file(path, sbom):
         print(f"File {path} was not found.")
 
 def read_package_file(path, sbom):
-    dependency_type = "npm"
+    """
+    Reads a package.json file and appends its dependencies to the SBOM.
+    Dependencies are represented by a dictionary containing name, version, type and path.
 
+    Includes both the dependencies and devDependencies from the package file.
+    """
+
+    dependency_type = "npm"
     try:
         with open(path) as f:
             print("Opening", path)
             data = json.load(f)
 
             # .get returns an empty dict if key is not found
-            # reads dependencies into sbom
             for name, version in data.get("dependencies", {}).items():
                 sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
 
-            # reads devDependencies into sbom
             for name, version in data.get("devDependencies", {}).items():
                 sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
 
-def write_to_csv(sbom, path):
-    csv_path = path + "sbom.csv"
+def read_package_lock_file(path, sbom):
+    """
+    Reads a package-lock.json file and appends its dependencies to the SBOM.
+    Dependencies are represented by a dictionary containing name, version, type and path.
 
+    Ignores the root entry and iterates over every remaining entry in the "packages" dictionary.
+    """
+
+    dependency_type = "npm"
+    try:
+        with open(path) as f:
+            print("Opening", path)
+            data = json.load(f)
+
+            for key, value in data["packages"].items():
+                if key == "":
+                    continue
+
+                version = value["version"]
+                name = key.split("node_modules/")[-1]
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
+
+    except FileNotFoundError:
+        print(f"File {path} was not found.")
+
+def write_to_csv(sbom, path):
+    """
+    Writes SBOM to CSV file removing field names, one entry and row per dependency.
+    Saves the file at the location of the path argument. 
+    """
+
+    csv_path = path + "sbom.csv"
     with open(csv_path, 'w', newline='') as f:
         fieldnames = ["name", "version", "type", "path"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -55,14 +88,34 @@ def write_to_csv(sbom, path):
         print(f"Saved SBOM in CSV format to '{csv_path}'")
 
 def write_to_json(sbom, path):
-    json_path = path + "sbom.json"
+    """
+    Writes SBOM to JSON file including field names.
+    Saves the file at the location of the path argument. 
+    """
 
+    json_path = path + "sbom.json"
     with open(json_path, 'w') as f:
         json.dump(sbom, f)
         print(f"Saved SBOM in JSON format to '{json_path}'")
 
+def remove_identical_entries(sbom):
+    unique_sbom = []
+    for dependency in sbom:
+        if dependency not in unique_sbom:
+            unique_sbom.append(dependency)
+
+    return unique_sbom
 
 def main():
+    """
+    Main function of the SBOM generator.
+    Validates directory path given as command-line argument.
+    Traverses subdirectories of the root directory searching for 
+    requirements.txt, package.json and package-lock.json files.
+    Writes dependencies found inside these files to SBOM files in CSV and JSON format.
+    Removes identical entries.
+    """
+
     if len(sys.argv) != 2:
         print(f"Error: expected 1 argument (directory path), but {len(sys.argv) - 1} were given.")
         sys.exit(1)
@@ -79,7 +132,6 @@ def main():
     if path[-1] != '/':
         path += '/'
 
-
     sbom = []
     # Traverse subdirectories
     for root, dirs, files in os.walk(path):
@@ -89,15 +141,20 @@ def main():
             if len(dirs) == 0:
                 print("Error: no subdirectories in the specified path was found.")
                 sys.exit(1)
-                
+
         else:
             # Check for requirements.txt file
             if "requirements.txt" in files:
                 requirements_path = root + "/requirements.txt"
                 read_requirements_file(requirements_path, sbom)
 
+            # Check for package-lock.json file
+            if "package-lock.json" in files:
+                package_lock_path = root + "/package-lock.json"
+                read_package_lock_file(package_lock_path, sbom)
+
             # Check for package.json file
-            if "package.json" in files:
+            elif "package.json" in files:
                 package_path = root + "/package.json"
                 read_package_file(package_path, sbom)
 
@@ -105,8 +162,8 @@ def main():
         print("Did not find any dependencies to list in SBOM.")
         sys.exit(0)
 
+    sbom = remove_identical_entries(sbom)
     write_to_csv(sbom, path)
     write_to_json(sbom, path)
-
 
 main()
