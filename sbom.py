@@ -2,11 +2,12 @@ import os
 import json
 import csv
 import sys
+import subprocess
 
-def read_requirements_file(path, sbom):
+def read_requirements_file(path, sbom, commit_hash):
     """
     Reads a requirements.txt file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type and path.
+    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
 
     Expects the file to follow the format name==version. 
     """
@@ -20,15 +21,15 @@ def read_requirements_file(path, sbom):
             for line in lines:
                 line = line.strip('\n')
                 name, version = line.split("==")
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
 
-def read_package_file(path, sbom):
+def read_package_file(path, sbom, commit_hash):
     """
     Reads a package.json file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type and path.
+    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
 
     Includes both the dependencies and devDependencies from the package file.
     """
@@ -41,18 +42,18 @@ def read_package_file(path, sbom):
 
             # .get returns an empty dict if key is not found
             for name, version in data.get("dependencies", {}).items():
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
 
             for name, version in data.get("devDependencies", {}).items():
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
 
-def read_package_lock_file(path, sbom):
+def read_package_lock_file(path, sbom, commit_hash):
     """
     Reads a package-lock.json file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type and path.
+    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
 
     Ignores the root entry and iterates over every remaining entry in the "packages" dictionary.
     """
@@ -69,7 +70,7 @@ def read_package_lock_file(path, sbom):
 
                 version = value["version"]
                 name = key.split("node_modules/")[-1]
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
@@ -82,7 +83,7 @@ def write_to_csv(sbom, path):
 
     csv_path = path + "sbom.csv"
     with open(csv_path, 'w', newline='') as f:
-        fieldnames = ["name", "version", "type", "path"]
+        fieldnames = ["name", "version", "type", "path", "git commit"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writerows(sbom)
         print(f"Saved SBOM in CSV format to '{csv_path}'")
@@ -143,20 +144,28 @@ def main():
                 sys.exit(1)
 
         else:
+            # Retrieve git commit hash
+            try:
+                commit = subprocess.check_output('git log --format="%H" -n 1', shell=True, cwd=root, text=True).strip()
+
+            except subprocess.CalledProcessError:
+                print(f"Error: '{root}' is not a Git repository.")
+                sys.exit(1)
+
             # Check for requirements.txt file
             if "requirements.txt" in files:
                 requirements_path = root + "/requirements.txt"
-                read_requirements_file(requirements_path, sbom)
+                read_requirements_file(requirements_path, sbom, commit)
 
             # Check for package-lock.json file
             if "package-lock.json" in files:
                 package_lock_path = root + "/package-lock.json"
-                read_package_lock_file(package_lock_path, sbom)
+                read_package_lock_file(package_lock_path, sbom, commit)
 
             # Check for package.json file
             elif "package.json" in files:
                 package_path = root + "/package.json"
-                read_package_file(package_path, sbom)
+                read_package_file(package_path, sbom, commit)
 
     if len(sbom) == 0:
         print("Did not find any dependencies to list in SBOM.")
