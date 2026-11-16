@@ -1,5 +1,5 @@
 # SBOM generator 
-Generates a SBOM as a CSV and a JSON file in the specified directory by traversing subdirectories examining requirements.txt and package.json files.
+Generates a SBOM as a CSV and a JSON file in the specified directory by traversing subdirectories examining requirements.txt, package-lock.json and package.json files.
 
 The SBOM includes the following columns:
 * Name
