@@ -7,7 +7,7 @@ import subprocess
 def read_requirements_file(path, sbom, commit_hash):
     """
     Reads a requirements.txt file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
+    Dependencies are represented by a dictionary containing name, version, type, path, scope and commit hash.
 
     Expects the file to follow the format name==version. 
     """
@@ -21,7 +21,7 @@ def read_requirements_file(path, sbom, commit_hash):
             for line in lines:
                 line = line.strip('\n')
                 name, version = line.split("==")
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "scope" : "Unknown", "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
@@ -29,7 +29,7 @@ def read_requirements_file(path, sbom, commit_hash):
 def read_package_file(path, sbom, commit_hash):
     """
     Reads a package.json file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
+    Dependencies are represented by a dictionary containing name, version, type, path, scope and commit hash.
 
     Includes both the dependencies and devDependencies from the package file.
     """
@@ -42,10 +42,10 @@ def read_package_file(path, sbom, commit_hash):
 
             # .get returns an empty dict if key is not found
             for name, version in data.get("dependencies", {}).items():
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "scope" : "Production", "git commit" : commit_hash})
 
             for name, version in data.get("devDependencies", {}).items():
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "scope" : "Development", "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
@@ -53,7 +53,7 @@ def read_package_file(path, sbom, commit_hash):
 def read_package_lock_file(path, sbom, commit_hash):
     """
     Reads a package-lock.json file and appends its dependencies to the SBOM.
-    Dependencies are represented by a dictionary containing name, version, type, path and commit hash.
+    Dependencies are represented by a dictionary containing name, version, type, path, scope and commit hash.
 
     Ignores the root entry and iterates over every remaining entry in the "packages" dictionary.
     """
@@ -64,13 +64,21 @@ def read_package_lock_file(path, sbom, commit_hash):
             print("Opening", path)
             data = json.load(f)
 
-            for key, value in data["packages"].items():
+            for key, value in data.get("packages", {}).items():
+                # Skip root entry
                 if key == "":
                     continue
 
-                version = value["version"]
+                # Remove node_modules/ from key to get name of package
                 name = key.split("node_modules/")[-1]
-                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "git commit" : commit_hash})
+                version = value["version"]
+
+                if value.get("dev", False):
+                    scope = "Development"
+                else:
+                    scope = "Production"
+
+                sbom.append({"name" : name, "version" : version, "type" : dependency_type, "path" : path, "scope" : scope, "git commit" : commit_hash})
 
     except FileNotFoundError:
         print(f"File {path} was not found.")
@@ -83,7 +91,7 @@ def write_to_csv(sbom, path):
 
     csv_path = path + "sbom.csv"
     with open(csv_path, 'w', newline='') as f:
-        fieldnames = ["name", "version", "type", "path", "git commit"]
+        fieldnames = ["name", "version", "type", "path", "scope", "git commit"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writerows(sbom)
         print(f"Saved SBOM in CSV format to '{csv_path}'")

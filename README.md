@@ -6,6 +6,7 @@ The SBOM includes the following columns:
 - Version
 - Type (npm or pip)
 - Absolute path to where the dependency was found
+- Scope (Production, Development or Unknown)
 - Git commit hash of the source code repository
 
 ## How to run
@@ -25,6 +26,7 @@ and replace /path/to/repos/ with the path to the cloned repository.
 
 ## Assumptions and limitations
 - Assumes dependencies inside requirements.txt are managed by pip and dependencies inside package.json and package-lock.json are managed by npm.
+- Dependencies inside requirements.txt have scope set to 'Unknown'.
 - Assumes requirements.txt files follow the format "name==version".
 - Assumes package-lock.json files use lockfile version 3.
 - If a package-lock.json file is found in a repository, the SBOM generator uses it instead of the package.json file to generate the dependencies. From the npm docs: "As of npm v7, lockfiles include enough information to gain a complete picture of the package tree, reducing the need to read package.json files". (https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json)
